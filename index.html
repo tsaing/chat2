@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>即時通訊軟體</title>
+  <!-- 引入Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- 引入Font Awesome -->
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  
+  <!-- Tailwind配置 -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#4F46E5',
+            secondary: '#6B7280',
+            success: '#10B981',
+          },
+          fontFamily: {
+            sans: ['system-ui', 'sans-serif'],
+          },
+        },
+      }
+    }
+  </script>
+  
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .content-auto {
+        content-visibility: auto;
+      }
+      .scrollbar-hide {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+      .scrollbar-hide::-webkit-scrollbar {
+        display: none;
+      }
+      .message-in {
+        animation: slideInLeft 0.3s ease-out;
+      }
+      .message-out {
+        animation: slideInRight 0.3s ease-out;
+      }
+    }
+    
+    @keyframes slideInLeft {
+      from { transform: translateX(-10px); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    
+    @keyframes slideInRight {
+      from { transform: translateX(10px); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans">
+  <!-- 登入頁面 -->
+  <div id="login-page" class="min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-md bg-white rounded-xl shadow-lg overflow-hidden">
+      <div class="bg-primary p-6 text-white text-center">
+        <i class="fa fa-comments text-4xl mb-3"></i>
+        <h1 class="text-2xl font-bold">即時通訊軟體</h1>
+      </div>
+      
+      <div class="p-6">
+        <!-- 密碼輸入表單 -->
+        <form id="password-form" class="space-y-4">
+          <div>
+            <label for="password" class="block text-sm font-medium text-secondary mb-1">請輸入密碼</label>
+            <div class="relative">
+              <input 
+                type="password" 
+                id="password" 
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition"
+                placeholder="請輸入密碼"
+                required
+              >
+              <button type="button" id="toggle-password" class="absolute right-3 top-1/2 -translate-y-1/2 text-secondary hover:text-primary">
+                <i class="fa fa-eye-slash"></i>
+              </button>
+            </div>
+            <p id="password-error" class="text-red-500 text-sm mt-1 hidden">密碼錯誤，請重新輸入（正確密碼：230189487）</p>
+          </div>
+          
+          <button 
+            type="submit" 
+            class="w-full bg-primary hover:bg-primary/90 text-white font-medium py-2 px-4 rounded-lg transition flex items-center justify-center gap-2"
+          >
+            <i class="fa fa-sign-in"></i>
+            <span>驗證密碼</span>
+          </button>
+        </form>
+        
+        <!-- 使用者名稱表單（預設隱藏） -->
+        <form id="username-form" class="space-y-4 hidden">
+          <div>
+            <label for="username" class="block text-sm font-medium text-secondary mb-1">請輸入使用者姓名</label>
+            <input 
+              type="text" 
+              id="username" 
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition"
+              placeholder="請輸入你的姓名"
+              required
+              minlength="2"
+              maxlength="10"
+            >
+          </div>
+          
+          <button 
+            type="submit" 
+            class="w-full bg-success hover:bg-success/90 text-white font-medium py-2 px-4 rounded-lg transition flex items-center justify-center gap-2"
+          >
+            <i class="fa fa-user"></i>
+            <span>進入通訊空間</span>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 聊天頁面（預設隱藏） -->
+  <div id="chat-page" class="min-h-screen flex flex-col hidden">
+    <!-- 頂部標題欄 -->
+    <header class="bg-primary text-white p-4 shadow">
+      <div class="max-w-4xl mx-auto flex justify-between items-center">
+        <div class="flex items-center gap-2">
+          <i class="fa fa-comments"></i>
+          <h1 class="text-xl font-bold">通訊空間</h1>
+        </div>
+        <div class="flex items-center gap-3">
+          <span id="current-user" class="text-sm bg-white/20 px-3 py-1 rounded-full">
+            <i class="fa fa-user mr-1"></i>
+            <span id="username-display"></span>
+          </span>
+          <button id="logout-btn" class="bg-white/20 hover:bg-white/30 p-2 rounded-full transition">
+            <i class="fa fa-sign-out"></i>
+          </button>
+        </div>
+      </div>
+    </header>
+    
+    <!-- 訊息顯示區 -->
+    <main class="flex-1 max-w-4xl w-full mx-auto p-4 overflow-y-auto scrollbar-hide bg-gray-50">
+      <div id="messages-container" class="space-y-4">
+        <!-- 訊息將透過Firebase即時加載 -->
+        <div class="text-center text-secondary text-sm py-8">
+          <p>正在載入歷史訊息...</p>
+        </div>
+      </div>
+    </main>
+    
+    <!-- 訊息輸入區 -->
+    <footer class="bg-white border-t border-gray-200 p-4">
+      <div class="max-w-4xl mx-auto">
+        <div class="flex gap-3">
+          <textarea 
+            id="message-input" 
+            class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition resize-none min-h-[60px] max-h-[120px]"
+            placeholder="輸入訊息後按Enter發送..."
+          ></textarea>
+          <button 
+            id="send-btn" 
+            class="bg-primary hover:bg-primary/90 text-white p-3 rounded-lg transition"
+            aria-label="發送"
+          >
+            <i class="fa fa-paper-plane"></i>
+          </button>
+        </div>
+        <div class="text-right text-xs text-secondary mt-2">
+          <p>已儲存 <span id="message-count">0</span>/30 條訊息 | 所有使用者可見</p>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <!-- 引入Firebase模組並初始化 -->
+  <script type="module">
+    // Import the functions you need from the SDKs you need
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js";
+    // 引入即時資料庫必要模組
+    import { getDatabase, ref, onValue, push, remove, once } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+    // Your web app's Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyCikm3n5wtQiTMmVMWwyb-AeSfzsy9H1dI",
+      authDomain: "ng-chat-bb271.firebaseapp.com",
+      projectId: "ng-chat-bb271",
+      storageBucket: "ng-chat-bb271.firebasestorage.app",
+      messagingSenderId: "11581831126",
+      appId: "1:11581831126:web:3a0e438390144fb5675677",
+      measurementId: "G-JRQFBLDJT1"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const analytics = getAnalytics(app);
+    
+    // 初始化即時資料庫
+    const db = getDatabase(app);
+    const messagesRef = ref(db, 'messages'); // 訊息儲存路徑
+    const MAX_MESSAGES = 30; // 最大儲存訊息數量
+
+    // 全域變數
+    let currentUsername = '';
+    const CORRECT_PASSWORD = '230189487';
+
+    // DOM元素
+    const loginPage = document.getElementById('login-page');
+    const chatPage = document.getElementById('chat-page');
+    const passwordForm = document.getElementById('password-form');
+    const usernameForm = document.getElementById('username-form');
+    const passwordInput = document.getElementById('password');
+    const usernameInput = document.getElementById('username');
+    const usernameDisplay = document.getElementById('username-display');
+    const passwordError = document.getElementById('password-error');
+    const togglePassword = document.getElementById('toggle-password');
+    const logoutBtn = document.getElementById('logout-btn');
+    const messageInput = document.getElementById('message-input');
+    const sendBtn = document.getElementById('send-btn');
+    const messagesContainer = document.getElementById('messages-container');
+    const messageCount = document.getElementById('message-count');
+
+    // 初始化
+    document.addEventListener('DOMContentLoaded', () => {
+      // 綁定事件
+      passwordForm.addEventListener('submit', handlePasswordSubmit);
+      usernameForm.addEventListener('submit', handleUsernameSubmit);
+      togglePassword.addEventListener('click', togglePasswordVisibility);
+      logoutBtn.addEventListener('click', handleLogout);
+      sendBtn.addEventListener('click', sendMessage);
+      messageInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          sendMessage();
+        }
+      });
+      
+      // 自動調整文字框高度
+      messageInput.addEventListener('input', () => {
+        messageInput.style.height = 'auto';
+        messageInput.style.height = (Math.min(messageInput.scrollHeight, 120)) + 'px';
+      });
+
+      // 監聽訊息變化（即時同步）
+      listenForMessages();
+    });
+
+    // 密碼驗證
+    function handlePasswordSubmit(e) {
+      e.preventDefault(); // 阻止頁面刷新
+      const password = passwordInput.value.trim();
+      
+      if (password === CORRECT_PASSWORD) {
+        passwordError.classList.add('hidden');
+        passwordForm.classList.add('hidden');
+        usernameForm.classList.remove('hidden');
+        usernameInput.focus();
+      } else {
+        passwordError.classList.remove('hidden');
+        passwordInput.classList.add('border-red-500');
+        setTimeout(() => passwordInput.classList.remove('border-red-500'), 2000);
+      }
+    }
+
+    // 使用者名稱提交
+    function handleUsernameSubmit(e) {
+      e.preventDefault(); // 阻止頁面刷新
+      currentUsername = usernameInput.value.trim();
+      
+      if (currentUsername) {
+        usernameDisplay.textContent = currentUsername;
+        loginPage.classList.add('hidden');
+        chatPage.classList.remove('hidden');
+        messageInput.focus();
+      }
+    }
+
+    // 發送訊息
+    function sendMessage() {
+      const content = messageInput.value.trim();
+      if (!content || !currentUsername) return;
+      
+      // 建立訊息物件
+      const message = {
+        username: currentUsername,
+        content: content,
+        timestamp: Date.now()
+      };
+      
+      // 儲存到Firebase
+      push(messagesRef, message);
+      
+      // 清空輸入框
+      messageInput.value = '';
+      messageInput.style.height = '60px';
+    }
+
+    // 監聽訊息（即時同步）
+    function listenForMessages() {
+      onValue(messagesRef, (snapshot) => {
+        const messages = snapshot.val() || {};
+        const messageList = Object.entries(messages).map(([id, data]) => ({
+          id,
+          ...data
+        }));
+        
+        // 按時間排序
+        messageList.sort((a, b) => a.timestamp - b.timestamp);
+        
+        // 限制最多30條訊息
+        if (messageList.length > MAX_MESSAGES) {
+          const messagesToRemove = messageList.slice(0, messageList.length - MAX_MESSAGES);
+          messagesToRemove.forEach(msg => remove(ref(db, `messages/${msg.id}`)));
+        }
+        
+        // 渲染訊息
+        renderMessages(messageList.slice(-MAX_MESSAGES));
+        
+        // 更新計數
+        messageCount.textContent = messageList.length > MAX_MESSAGES ? MAX_MESSAGES : messageList.length;
+      });
+    }
+
+    // 渲染訊息列表
+    function renderMessages(messages) {
+      if (messages.length === 0) {
+        messagesContainer.innerHTML = `
+          <div class="text-center text-secondary text-sm py-8">
+            <p>還沒有訊息，開始對話吧！</p>
+          </div>
+        `;
+        return;
+      }
+      
+      messagesContainer.innerHTML = messages.map(msg => {
+        const isCurrentUser = msg.username === currentUsername;
+        const time = new Date(msg.timestamp).toLocaleTimeString('zh-TW');
+        
+        return `
+          <div class="flex ${isCurrentUser ? 'justify-end' : 'justify-start'}">
+            <div class="${isCurrentUser ? 'message-out' : 'message-in'} max-w-[80%]">
+              <div class="flex ${isCurrentUser ? 'justify-end' : 'justify-start'} items-center mb-1">
+                <span class="text-xs font-medium ${isCurrentUser ? 'text-primary' : 'text-secondary'}">
+                  ${msg.username}
+                </span>
+                <span class="text-xs text-gray-400 ml-2">${time}</span>
+              </div>
+              <div class="px-4 py-2 rounded-lg ${
+                isCurrentUser 
+                  ? 'bg-primary text-white rounded-tr-none' 
+                  : 'bg-white text-gray-800 rounded-tl-none shadow-sm border border-gray-100'
+              }">
+                <p>${escapeHtml(msg.content)}</p>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+      
+      // 滾動到最新訊息
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    // 登出功能
+    function handleLogout() {
+      if (confirm('確定要登出嗎？')) {
+        currentUsername = '';
+        passwordInput.value = '';
+        usernameInput.value = '';
+        usernameForm.classList.add('hidden');
+        passwordForm.classList.remove('hidden');
+        chatPage.classList.add('hidden');
+        loginPage.classList.remove('hidden');
+        passwordInput.focus();
+      }
+    }
+
+    // 切換密碼可見性
+    function togglePasswordVisibility() {
+      const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+      passwordInput.setAttribute('type', type);
+      const icon = togglePassword.querySelector('i');
+      icon.classList.toggle('fa-eye');
+      icon.classList.toggle('fa-eye-slash');
+    }
+
+    // 防XSS攻擊（轉義HTML）
+    function escapeHtml(unsafe) {
+      return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+  </script>
+</body>
+</html>
